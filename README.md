@@ -1,159 +1,147 @@
 # Windows Heat Coefficient Prediction
 
-Un projet de machine learning pour prédire le coefficient thermique / de transfert de chaleur de fenêtres (valeur U, conductance thermique ou autre métrique de performance thermique) à partir de caractéristiques disponibles (géométrie, matériaux, conditions environnementales, etc.).
+A machine learning project for predicting thermal transmission coefficients (U-values) of windows using building energy performance data.
 
-Ce dépôt contient le code, les notebooks et les scripts nécessaires pour entraîner, évaluer et déployer des modèles de régression qui estiment la performance thermique des fenêtres.
+## Overview
 
-## Table des matières
-- [Aperçu](#aperçu)
-- [Fonctionnalités](#fonctionnalités)
-- [Structure du dépôt](#structure-du-dépôt)
-- [Prérequis](#prérequis)
-- [Installation](#installation)
-- [Jeux de données](#jeux-de-données)
-- [Usage](#usage)
-  - [Exploration avec notebook](#exploration-avec-notebook)
-  - [Entraînement](#entraînement)
-  - [Évaluation](#évaluation)
-  - [Prédiction / Inference](#prédiction--inference)
-- [Approche modèle](#approche-modèle)
-- [Métriques d'évaluation](#métriques-dévaluation)
-- [Reproductibilité](#reproductibilité)
-- [Contribuer](#contribuer)
-- [Licence](#licence)
-- [Contact](#contact)
+This project uses Random Forest Regression to predict the heat transfer coefficient (`u_baie_vitree`) of windows based on various building characteristics and window properties. The model is trained on French DPE (Diagnostic de Performance Énergétique) data.
 
-## Aperçu
-L'objectif est de fournir une pipeline reproductible permettant :
-- de préparer et valider des jeux de données sur les fenêtres,
-- d'entraîner plusieurs modèles de régression (baseline et modèles avancés),
-- d'évaluer et comparer leurs performances,
-- et d'exposer un point d'entrée (script ou API) pour faire des prédictions sur de nouvelles fenêtres.
+## Dataset
 
-## Fonctionnalités
-- Pipeline de prétraitement (nettoyage, encodages, normalisation)
-- Entraînement configurable (fichiers de configuration / arguments CLI)
-- Évaluation et visualisations des résultats
-- Notebooks d'exploration et de démonstration
-- Enregistrements de modèles et gestion des artefacts
+The project uses two main data sources:
+- `Phebus_chauffage_allege_avec_new_R_new_S.xlsx`: Building heating data
+- `batiment_groupe_dpe_representatif_logement.csv`: Representative building energy performance diagnostics
 
-## Structure du dépôt
-(Exemple attendu — adaptez si différent)
-- data/                      — jeux de données (ne pas committer les données sensibles)
-- notebooks/                 — notebooks d'exploration et d'expérimentation
-- src/                       — code source (prétraitement, modèles, entraînement, utils)
-- configs/                   — configurations pour entraînement/expérimentation
-- models/                    — modèles entraînés / checkpoints
-- results/                   — métriques, graphiques et rapports
-- requirements.txt           — dépendances Python
-- README.md
+## Features
 
-## Prérequis
-- Python 3.8+
-- pip (ou conda)
-- Espace disque suffisant pour les jeux de données et les checkpoints
+The model uses the following features to predict window U-values:
 
-## Installation
-1. Cloner le dépôt :
-   ```
-   git clone https://github.com/eliasbr26/windows_heat_coefficient_prediction.git
-   cd windows_heat_coefficient_prediction
-   ```
+### Numerical Features
+- `annee_construction_dpe`: Construction year
+- `epaisseur_lame`: Thickness of the air gap between glass panes
+- `vitrage_vir`: Low-emissivity coating indicator
+- `surface_vitree_nord/sud/ouest/est`: Glazed surface area by orientation (North/South/West/East)
+- `surface_habitable_logement`: Total habitable surface area
+- `presence_balcon`: Presence of balcony
 
-2. Créer un environnement virtuel et activer :
-   - Avec venv :
-     ```
-     python -m venv .venv
-     source .venv/bin/activate  # Linux / macOS
-     .\.venv\Scripts\activate   # Windows
-     ```
-   - Ou avec conda :
-     ```
-     conda create -n whcp python=3.9
-     conda activate whcp
-     ```
+### Categorical Features
+- `type_vitrage`: Type of glazing (simple, double, triple)
+- `type_materiaux_menuiserie`: Frame material (wood, PVC, metal, etc.)
+- `type_gaz_lame`: Gas fill type (air, argon, etc.)
+- `type_fermeture`: Type of window closure/shutter
 
-3. Installer les dépendances :
-   ```
-   pip install -r requirements.txt
-   ```
+## Methodology
 
-## Jeux de données
-- Structure attendue (exemple) : un fichier CSV `data/windows.csv` contenant une ligne par fenêtre avec colonnes telles que :
-  - id, width, height, glazing_type, frame_material, insulation_thickness, indoor_temp, outdoor_temp, measured_coefficient
-- Le script de prétraitement (src/data_preprocessing.py) prend en entrée le CSV brut et produit des jeux train/val/test.
-- IMPORTANT : ne commitez pas les jeux de données sensibles dans le dépôt public. Utilisez `.gitignore` pour exclure `data/` si nécessaire.
+### Data Preprocessing
+1. **Missing Value Handling**:
+   - Numerical features: Imputed with mean values
+   - Categorical features: Imputed with most frequent values
+
+2. **Feature Engineering**:
+   - One-hot encoding for categorical variables
+   - Removal of rows where target variable (`u_baie_vitree`) is missing
+
+3. **Train-Test Split**: 80/20 split with random state 42
+
+### Model
+
+- **Algorithm**: Random Forest Regressor
+- **Parameters**: 
+  - `n_estimators=30`
+  - `random_state=42`
+
+## Results
+
+### Model Performance
+
+```
+Mean Absolute Error (MAE): 0.218
+Mean Squared Error (MSE): 0.133
+Root Mean Squared Error (RMSE): 0.365
+R² Score: 0.885
+```
+
+The model achieves an **R² score of 0.885**, indicating that it explains approximately 88.5% of the variance in window U-values.
+
+### Feature Importance
+
+Top 10 most important features:
+
+| Feature | Importance |
+|---------|-----------|
+| Simple glazing type | 48.56% |
+| Low-E coating (VIR) | 14.58% |
+| No window closure | 11.60% |
+| Metal frame without thermal break | 5.25% |
+| PVC frame | 3.05% |
+| Air gap thickness | 2.92% |
+| Habitable surface area | 2.44% |
+| West-facing glazed area | 2.16% |
+| East-facing glazed area | 2.13% |
+| South-facing glazed area | 2.04% |
+
+## Visualizations
+
+The notebook includes:
+1. **Actual vs Predicted Values Plot**: Shows model prediction accuracy
+2. **Residuals Plot**: Displays prediction errors across different predicted values
+
+## Requirements
+
+```python
+pandas
+numpy
+scikit-learn
+matplotlib
+openpyxl  # for Excel file reading
+```
 
 ## Usage
 
-### Exploration avec notebook
-- Ouvrir et exécuter les notebooks dans `notebooks/` pour comprendre les données et tester des pipelines :
-  ```
-  jupyter lab
-  ```
-  ou
-  ```
-  jupyter notebook
-  ```
-  Puis ouvrir `notebooks/01_exploration.ipynb` (nom d'exemple).
+```python
+# Load and preprocess data
+df = pd.read_csv("batiment_groupe_dpe_representatif_logement.csv")
 
-### Entraînement
-- Exemple de commande CLI (adapter selon les scripts présents) :
-  ```
-  python src/train.py --config configs/train.yaml
-  ```
-- Paramètres typiques :
-  - chemin vers les données
-  - hyperparamètres (learning rate, epochs, batch size)
-  - chemin de sortie pour les modèles
+# Train model
+rf = RandomForestRegressor(n_estimators=30, random_state=42)
+rf.fit(X_train, y_train)
 
-### Évaluation
-- Après entraînement, exécuter :
-  ```
-  python src/evaluate.py --model models/latest_model.pkl --test data/test.csv
-  ```
-- Génère un rapport avec métriques et courbes (ex : prédictions vs vrai).
+# Make predictions
+predictions = rf.predict(X_test)
+```
 
-### Prédiction / Inference
-- Exemple d'utilisation pour prédire un seul échantillon :
-  ```
-  python src/predict.py --model models/latest_model.pkl --input '{"width":1.2,"height":1.5,"glazing_type":"double","frame_material":"uPVC",...}'
-  ```
-- Ou charger le modèle dans un notebook pour des prédictions en batch.
+## Project Structure
 
-## Approche modèle
-- Problème formulé comme une régression supervisée.
-- Baselines recommandées :
-  - Régression linéaire / Ridge / Lasso
-  - Random Forest Regressor
-  - XGBoost / LightGBM
-  - Un réseau neuronal simple si jeu de données volumineux
-- Comparer modèles via validation croisée et jeu de test dédié.
+```
+windows_heat_coefficient_prediction/
+├── test.ipynb                                          # Main analysis notebook
+├── batiment_groupe_dpe_representatif_logement.csv     # DPE dataset
+├── Phebus_chauffage_allege_avec_new_R_new_S.xlsx     # Heating data
+└── README.md                                          # This file
+```
 
-## Métriques d'évaluation
-- RMSE (Root Mean Squared Error)
-- MAE (Mean Absolute Error)
-- R² (coefficient de détermination)
-- Visualisations : courbe prédiction vs réalité, histogramme des erreurs
+## Key Insights
 
-## Reproductibilité
-- Fixer le seed global dans les scripts (numpy, random, torch) pour rendre les expériences reproductibles.
-- Enregistrer la configuration complète (fichier config, hash du commit) avec chaque artefact.
+1. **Glazing type** is by far the most important predictor (48.6% importance), with simple glazing having significantly higher U-values than double or triple glazing.
 
-## Contribuer
-- Forkez le dépôt, créez une branche dédiée (feature/xxx ou fix/yyy).
-- Ouvez une pull request avec description claire des modifications.
-- Ajoutez des tests pour tout comportement nouveau ou modifié.
-- Respectez le style de code (PEP8). Linter/config peut être ajouté au besoin.
+2. **Low-E coating** (VIR) is the second most important feature (14.6%), indicating substantial impact on thermal performance.
 
-## Licence
-Précisez la licence du projet (ex : MIT). Si aucun fichier LICENSE n'est présent, ajoutez-en un avant de publier.
+3. **Frame material** and **shutter presence** also play significant roles in determining window thermal efficiency.
 
-## Contact
-Pour toute question, contactez l'auteur / mainteneur : @eliasbr26 (GitHub).
+4. The model shows good generalization with consistent residual distribution across predicted values.
 
----
+## Future Improvements
 
-Notes :
-- Adaptez les noms de fichiers et les commandes à la structure réelle du dépôt si elle diffère.
-- Pensez à ajouter un fichier `requirements.txt` ou `environment.yml` et un `LICENSE`.
+- Hyperparameter tuning using GridSearchCV or RandomizedSearchCV
+- Feature selection to reduce dimensionality
+- Testing alternative algorithms (XGBoost, LightGBM)
+- Cross-validation for more robust performance estimates
+- Analysis of prediction errors for different building types
+
+## License
+
+This project uses publicly available French DPE data for research purposes.
+
+## Author
+
+eliasbr26
